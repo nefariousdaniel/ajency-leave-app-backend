@@ -125,7 +125,11 @@ app.post("/api/leaves", async (req, res) => {
             await base("Company").select({ filterByFormula: `{Teams Leading (Record ID)} = "${el}"` })
             .firstPage()
             .then(res=>{
-                emailList.push(res[0].fields.Email)
+                try{
+                    emailList.push(res[0].fields.Email)
+                } catch {
+                    emailList.push("")
+                }
             })
         })
         let timeout = setTimeout(async () => {
