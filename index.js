@@ -1,20 +1,20 @@
 const express = require("express");
 const Airtable = require("airtable")
-const dotenv = require("dotenv").config()
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const { type } = require("express/lib/response");
 const axios = require("axios").default;
+const { SendEmail } = require("./EmailSender.js")
+const { CreateEvent } = require("./CreateCalendarEvent.js")
 
 Airtable.configure({
     endpointUrl: 'https://api.airtable.com',
-    apiKey: process.env.AIRTABLE_API_KEY
+    apiKey: "keyFpXfRESHia3TUo"
 });
 
 
-var base = Airtable.base(process.env.AIRTABLE_BASE)
+var base = Airtable.base("appl5N2S5ynIWUTRh")
 
 const app = express();
 
@@ -24,144 +24,201 @@ app.use(cookieParser())
 app.use(express.static("./dist"))
 
 app.post("/api/register", async (req, res) => {
-    let result = await base("Company").select({
-        filterByFormula: `FIND("${req.body.Email}",{Email})`,
-        maxRecords: 1
-    })
-    result = await result.firstPage()
-    if (result.length === 0) {
-        req.body.Password = bcrypt.hashSync(req.body.Password, 8)
+    try {
+        let result = await base("Company").select({
+            filterByFormula: `FIND("${req.body.Email}",{Email})`,
+            maxRecords: 1
+        }).firstPage();
+        if (result.length !== 0) {
+            res.status(409).json({
+                statusCode: 409,
+                status: "FAIL",
+                message: "Account already exist.",
+            })
+            return;
+        }
+        req.body.Password = bcrypt.hashSync(req.body.Password, 8);
+        req.body.Status = "Active";
         result = await base("Company").create([{ fields: req.body }]);
-        res.status(200).json({
-            statusCode: 200,
+        res.status(201).json({
+            statusCode: 201,
+            status: "OK",
             message: "Account Created.",
         })
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
+            statusCode: 500,
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
+        })
     }
-    else res.status(409).json({
-        statusCode: 409,
-        message: "Account already exist.",
-    })
 
 })
 
 app.post("/api/login", async (req, res) => {
-    var result = await base("Company").select({
-        filterByFormula: `FIND("${req.body.email}",{Email})`,
-        maxRecords: 1
-    }).firstPage()
-    if (result.length === 0) {
-        res.status(401).json({ statusCode: 401, message: "Wrong Credentials" });
+    try {
+        var result = await base("Company").select({
+            filterByFormula: `FIND("${req.body.email}",{Email})`,
+            maxRecords: 1
+        }).firstPage()
+        if (result.length === 0) {
+            res.status(401).json({ statusCode: 401, status: "FAIL", message: "Wrong Credentials" });
+            return;
+        }
+
+        if (bcrypt.compareSync(req.body.password, result[0].fields.Password)) {
+            delete result[0].fields.Password;
+            let token = jwt.sign({ user: result[0].fields }, "SomeSecretJibberJabber", { expiresIn: "1day" })
+            res.status(200).json({ statusCode: 200, status: "OK", message: "Authentication Successful", token: token });
+        }
+        else {
+            res.status(401).json({ statusCode: 401, status: "FAIL", message: "Wrong Credentials" });
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
+            statusCode: 500,
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
+        })
     }
-    result.forEach(el => {
-        let password = el.fields.Password;
-        delete el.fields.Password;
-        let token = jwt.sign({ user: el._rawJson }, process.env.JWT_SECRET, { expiresIn: "1day" })
-        if (bcrypt.compareSync(req.body.password, password)) res.status(200).cookie("token", token).json({ statusCode: 200, data: el._rawJson, token: token });
-        else res.status(401).json({ statusCode: 401, message: "Wrong Credentials" });
-    })
 })
 
 app.use((req, res, next) => {
     try {
-        let token = req.body.token || req.cookies.token || req.headers.token;
-        let decodedToken = jwt.verify(token, process.env.JWT_SECRET)
+        let token = req.headers.authorization.split(" ")[1];
+        let decodedToken = jwt.verify(token, "SomeSecretJibberJabber", { ignoreExpiration: true })
         req.body.decodedToken = decodedToken;
-        next()
+        next();
     } catch (error) {
-        res.status(401).json({ statusCode: 401, message: "UNAUTHORIZED" });
+        console.log(error);
+        res.status(401).json({ statusCode: 401, status: "FAIL", message: "UNAUTHORIZED" });
     }
 })
 
-app.get("/api/user", async (req, res) => {
-    var result = await base("Company").find(req.body.decodedToken.user.id)
-    res.status(200).json({
-        statusCode: 200,
-        message: "User Details Fetch Successful",
-        data: result._rawJson
-    });
-})
+app.get("/api/user/fetchUserDetails", async (req, res) => {
 
-app.get("/api/leaves", async (req, res) => {
-    let data = []
-    let name = req.body.decodedToken.user.fields.Name;
-    var result = await base("Leaves").select({
-        filterByFormula: `FIND("${name}",{Users})`,
-        sort: [{ field: "Request Date", direction: "desc" }]
-    })
-    result = await result.firstPage();
-    result.forEach(el => {
-        data.push(el.fields)
-    })
-    res.status(200).json(data);
-})
-
-app.post("/api/leaves", async (req, res) => {
-    let HolidaysIDs = [];
-    var result = await base('Holidays').select().firstPage();
-
-    result.forEach(el => {
-        HolidaysIDs.push(el.id);
-    })
-    
     try {
+        var result = await base("Company").find(req.body.decodedToken.user["Record ID"]);
+        delete result.fields.Password;
+        res.status(200).json({
+            statusCode: 200,
+            status: "OK",
+            message: "User Details Fetch Successful",
+            data: result.fields
+        });
+
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
+            statusCode: 500,
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
+        })
+    }
+})
+
+app.get("/api/leaves/fetchUserLeaves", async (req, res) => {
+    try {
+        var result = await base("Leaves").select({
+            filterByFormula: `FIND("${req.body.decodedToken.user.Name}",{Users})`,
+            sort: [{ field: "Request Date", direction: "desc" }]
+        }).firstPage();
+        res.status(200).json({
+            statusCode: 200,
+            status: "OK",
+            message: "User Leaves Fetch Successful",
+            data: result
+        });
+
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
+            statusCode: 500,
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
+        })
+    }
+})
+
+app.post("/api/leaves/requestLeaves", async (req, res) => {
+
+
+
+    try {
+        let HolidaysIDs = [];
+        var result = await base('Holidays').select().firstPage();
+
+        for (r of result) {
+            HolidaysIDs.push(r.id)
+        }
+
         var result = await base('Leaves').create([{
             fields: {
                 ["Start Date"]: req.body.startDate,
                 ["End Date"]: req.body.endDate,
                 ["Leave Reason"]: req.body.reason,
                 "Users": [
-                    req.body.decodedToken.user.id
+                    req.body.decodedToken.user["Record ID"]
                 ],
                 "Holidays Link": HolidaysIDs
             }
         }]);
 
-
-//base("Company").select({ filterByFormula: `FIND("${el}",{Teams Leading (Record ID)})` }).firstPage()
-        result = await base("Company").find(req.body.decodedToken.user.id);
+        result = await base("Company").find(req.body.decodedToken.user["Record ID"]);
         var teamsBelongsTo = result.fields["Teams (Belongs To)"];
-        var emailList = []
-        teamsBelongsTo.forEach(async el=>{
-            await base("Company").select({ filterByFormula: `{Teams Leading (Record ID)} = "${el}"` })
-            .firstPage()
-            .then(res=>{
-                try{
-                    emailList.push(res[0].fields.Email)
-                } catch {
-                    emailList.push("")
-                }
-            })
-        })
-        let timeout = setTimeout(async () => {
-            emailList = emailList.join(",")
-            clearTimeout(timeout);
+        let emailList = []
+
+        for (el of teamsBelongsTo) {
+            await base("Company").select({ filterByFormula: `FIND("${el}",{Teams Leading (Record ID)})` }).firstPage()
+                .then(r => {
+                    try {
+                        emailList.push(r[0].fields.Email)
+                    } catch {
+
+                    }
+                })
+        }
+
+        let postDataEmailIntegration = {
+            to: emailList,
+            subject: `(${req.body.decodedToken.user["Name"]})'s Leave Application`,
+            emailbody: `<div style="width: 440px; margin: auto; border: none; border-radius: 3px; box-shadow:0px 0px 10px black; padding: 30px; ">
+            <h1 style="text-align: center; color: #f9bc23">Ajency.in Leave App</h1>
             
-            let postDataEmailIntegration = {
-                to: emailList,
-                subject: `(${req.body.decodedToken.user.fields["Name"]})'s Leave Application`,
-                emailbody: `<p>Hi,</p>
-                <p>${req.body.decodedToken.user.fields["Name"]} has applied for leave </p>
-                <p>from: ${req.body.startDate}</p>
-                <p>to: ${req.body.endDate}</p>
-                <p>for reason being (${req.body.reason}).</b></p>`
-            }
-            console.log(postDataEmailIntegration)
+            <p>Hi,</p>
+            <p>
+            ${req.body.decodedToken.user["Name"]} has applied for leave from <b>${new Date(req.body.startDate).toDateString()}</b> to <b>${new Date(req.body.endDate).toDateString()}</b> for reason being <b>(${req.body.reason}).</b>
+            </p>
+            
+            <table style="width: 100%; text-align: center">
+              <tr>
+                <td>Start Date:</td>
+                <td>${new Date(req.body.startDate).toDateString()}</td>
+              </tr>
+              <tr>
+                <td>End Date:</td>
+                <td>${new Date(req.body.endDate).toDateString()}</td>
+              </tr>
+            </table>
+          </div>`
+        }
+        await SendEmail(postDataEmailIntegration)
 
-            await axios.post('https://wnwpoyb95i.execute-api.ap-south-1.amazonaws.com/Deploy/integrate-email', postDataEmailIntegration, { headers: { "Content-type": "application/json" } })
-        }, 5000);        
-
-        
-
-
-        res.status(200).send({
+        res.status(200).json({
             statusCode: 200,
-            message: "Request has been Recorded."
-        })
-    }
-    catch (err) {
-        res.status(500).send({
+            status: "OK",
+            message: "Applied Leave Successfully",
+        });
+
+
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
             statusCode: 500,
-            message: "Error with Server."
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
         })
     }
 
@@ -170,7 +227,7 @@ app.post("/api/leaves", async (req, res) => {
 // =========================================================================== Admin Routes Gateway
 app.use((req, res, next) => {
     try {
-        if (req.body.decodedToken.user.fields["Is Admin"] === "true")
+        if (req.body.decodedToken.user["Is Admin"] === "true")
             next()
         else throw ("UNAUTHORIZED")
     } catch (error) {
@@ -178,20 +235,29 @@ app.use((req, res, next) => {
     }
 })
 
-app.get("/api/leaves/all", async (req, res) => {
-    let data = []
-    let name = req.body.decodedToken.user.fields.Name;
-    var result = await base("Leaves").select({
-        sort: [{ field: "Request Date", direction: "desc" }]
-    })
-    result = await result.firstPage();
-    result.forEach(el => {
-        data.push(el.fields)
-    })
-    res.status(200).json(data);
+app.get("/api/leaves/fetchEmployeeLeaves", async (req, res) => {
+    try {
+        var result = await base("Leaves").select({
+            sort: [{ field: "Request Date", direction: "desc" }]
+        }).firstPage();
+        res.status(200).json({
+            statusCode: 200,
+            status: "OK",
+            message: "Employees Leaves Fetch Successful",
+            data: result
+        });
+
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
+            statusCode: 500,
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
+        })
+    }
 })
 
-app.post("/api/leaves/status", async (req, res) => {
+app.put("/api/leaves/setStatus", async (req, res) => {
     try {
 
         await base('Leaves').update([{
@@ -206,14 +272,32 @@ app.post("/api/leaves/status", async (req, res) => {
         let postDataEmailIntegration = {
             to: result.fields["Email"][0],
             subject: `(${result.fields["Name"]}) Leave Status`,
-            emailbody: `<p>Hello ${result.fields["Name"]}</p>
-            <p>Your leave (${result.fields["Leave Reason"]}) </p>
-            <p>from: ${result.fields["Start Date"]}</p>
-            <p>to: ${result.fields["End Date"]}</p>
-            <p>for a period of ${result.fields["Number of Days"]} days</p>
-            <p>has been <b>${result.fields["Status"]}.</b></p>`
+            emailbody: `<div style="width: 440px; margin: auto; border: none; border-radius: 3px; box-shadow:0px 0px 10px black; padding: 30px; ">
+            <h1 style="text-align: center; color: #f9bc23">Ajency.in Leave App</h1>
+            
+            <p>Hello ${result.fields["Name"]},</p>
+            <p style="">
+                Your leave (${result.fields["Leave Reason"]}) from <b>${new Date(result.fields["Start Date"]).toDateString()}</b> to <b>${new Date(result.fields["End Date"]).toDateString()}</b> for a period of <b>${result.fields["Number of Days"]} days</b>, has been <b>${result.fields["Status"]}.</b>
+            </p>
+            
+            <table style="width: 100%; text-align: center">
+              <tr>
+                <td>Start Date:</td>
+                <td>${new Date(result.fields["Start Date"]).toDateString()}</td>
+              </tr>
+              <tr>
+                <td>End Date:</td>
+                <td>${new Date(result.fields["End Date"]).toDateString()}</td>
+              </tr>
+              <tr>
+                <td>Status:</td>
+                <td>${result.fields["Status"]}</td>
+              </tr>
+            </table>
+          </div>`
         }
-        await axios.post('https://wnwpoyb95i.execute-api.ap-south-1.amazonaws.com/Deploy/integrate-email', postDataEmailIntegration, { headers: { "Content-type": "application/json" } })
+
+        await SendEmail(postDataEmailIntegration)
 
 
         if (result.fields["Status"] === "Approved") {
@@ -228,16 +312,26 @@ app.post("/api/leaves/status", async (req, res) => {
                     'dateTime': new Date(result.fields["End Date"]).toISOString(),
                 },
             }
-            await axios.post('https://wnwpoyb95i.execute-api.ap-south-1.amazonaws.com/Deploy/integrate-google-calendar', postDataGoogleCalendarIntegration, { headers: { "Content-type": "application/json" } })
 
+            await CreateEvent(postDataGoogleCalendarIntegration);
         }
-        res.status(200).json(req.body);
-    } catch (e) {
-        res.status(400).json({ statusCode: 400, message: "Failed to Update" });
+        res.status(200).json({
+            statusCode: 200,
+            status: "OK",
+            message: "Status set Successfully",
+        });
+
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({
+            statusCode: 500,
+            status: "FAIL",
+            message: "Some Server Error Occurred.",
+        })
     }
 
 })
 
-app.listen(process.env.PORT, () => {
-    console.log(`Server Started on port: ${process.env.PORT}`)
+app.listen(5000, () => {
+    console.log(`Server Started on port: 5000`)
 })
