@@ -5,8 +5,8 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const axios = require("axios").default;
-const { SendEmail } = require("./EmailSender.js")
-const { CreateEvent } = require("./CreateCalendarEvent.js")
+const { CreateCalendarEvent } = require("./GoogleCalendarIntegration")
+const { SendMail } = require("./GoogleMailIntegration")
 
 Airtable.configure({
     endpointUrl: 'https://api.airtable.com',
@@ -142,9 +142,7 @@ app.get("/api/leaves/fetchUserLeaves", async (req, res) => {
     }
 })
 
-app.post("/api/leaves/requestLeaves", async (req, res) => {
-
-
+app.post("/api/leaves/requestLeave", async (req, res) => {
 
     try {
         let HolidaysIDs = [];
@@ -187,7 +185,7 @@ app.post("/api/leaves/requestLeaves", async (req, res) => {
             emailbody: `<div style="width: 440px; margin: auto; border: none; border-radius: 3px; box-shadow:0px 0px 10px black; padding: 30px; ">
             <h1 style="text-align: center; color: #f9bc23">Ajency.in Leave App</h1>
             
-            <p>Hi,</p>
+            <p>Hello There,</p>
             <p>
             ${req.body.decodedToken.user["Name"]} has applied for leave from <b>${new Date(req.body.startDate).toDateString()}</b> to <b>${new Date(req.body.endDate).toDateString()}</b> for reason being <b>(${req.body.reason}).</b>
             </p>
@@ -204,7 +202,7 @@ app.post("/api/leaves/requestLeaves", async (req, res) => {
             </table>
           </div>`
         }
-        await SendEmail(postDataEmailIntegration)
+        await SendMail(postDataEmailIntegration)
 
         res.status(200).json({
             statusCode: 200,
@@ -297,7 +295,7 @@ app.put("/api/leaves/setStatus", async (req, res) => {
           </div>`
         }
 
-        await SendEmail(postDataEmailIntegration)
+        await SendMail(postDataEmailIntegration)
 
 
         if (result.fields["Status"] === "Approved") {
@@ -313,7 +311,7 @@ app.put("/api/leaves/setStatus", async (req, res) => {
                 },
             }
 
-            await CreateEvent(postDataGoogleCalendarIntegration);
+            await CreateCalendarEvent(postDataGoogleCalendarIntegration);
         }
         res.status(200).json({
             statusCode: 200,
