@@ -67,6 +67,10 @@ app.post("/api/login", async (req, res) => {
             return;
         }
 
+        if(result[0].fields.Status === "Inactive"){
+            res.status(401).json({ statusCode: 401, status: "FAIL", message: "Account Inactive"});
+        }
+
         if (bcrypt.compareSync(req.body.password, result[0].fields.Password)) {
             delete result[0].fields.Password;
             let token = jwt.sign({ user: result[0].fields }, "SomeSecretJibberJabber", { expiresIn: "1day" })
