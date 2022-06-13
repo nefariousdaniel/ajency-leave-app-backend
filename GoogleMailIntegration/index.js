@@ -86,7 +86,7 @@ exports.SendMail = async function(event){
   
     const utf8Subject = `=?utf-8?B?${Buffer.from(event.subject).toString('base64')}?=`;
     const messageParts = [
-      'From: leaves@ajency.in',
+      'From: dilbert@ajency.in',
       `To: ${event.to}`,
       'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
@@ -104,7 +104,7 @@ exports.SendMail = async function(event){
       .replace(/=+$/, '');
   
     const res = await gmail.users.messages.send({
-      userId: 'leaves@ajency.in',
+      userId: 'me',
       requestBody: {
         raw: encodedMessage,
       },
