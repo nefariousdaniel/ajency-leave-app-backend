@@ -312,10 +312,10 @@ app.put("/api/leaves/setStatus", async (req, res) => {
                 'summary': `${result.fields["Name"]} on Leave (${result.fields["Email"][0]})`,
                 'description': `${result.fields["Leave Reason"]}`,
                 'start': {
-                    'dateTime': new Date(result.fields["Start Date"]).toISOString(),
+                    'date': result.fields["Start Date"],
                 },
                 'end': {
-                    'dateTime': new Date(result.fields["End Date"]).toISOString(),
+                    'date': result.fields["End Date"],
                 },
             }
 
