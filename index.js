@@ -69,6 +69,7 @@ app.post("/api/login", async (req, res) => {
 
         if(result[0].fields.Status === "Inactive"){
             res.status(401).json({ statusCode: 401, status: "FAIL", message: "Account Inactive"});
+            return;
         }
 
         if (bcrypt.compareSync(req.body.password, result[0].fields.Password)) {
