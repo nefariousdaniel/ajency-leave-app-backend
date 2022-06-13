@@ -86,7 +86,7 @@ exports.SendMail = async function(event){
   
     const utf8Subject = `=?utf-8?B?${Buffer.from(event.subject).toString('base64')}?=`;
     const messageParts = [
-      'From: pascoal@ajency.in',
+      'From: Ajency.In Leave App <leaves@ajency.in>',
       `To: ${event.to}`,
       'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
