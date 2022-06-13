@@ -104,7 +104,7 @@ exports.SendMail = async function(event){
       .replace(/=+$/, '');
   
     const res = await gmail.users.messages.send({
-      userId: 'me',
+      userId: 'leaves@ajency.in',
       requestBody: {
         raw: encodedMessage,
       },
