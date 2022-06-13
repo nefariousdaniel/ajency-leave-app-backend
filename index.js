@@ -309,7 +309,7 @@ app.put("/api/leaves/setStatus", async (req, res) => {
         if (result.fields["Status"] === "Approved") {
             let endDate = new Date(result.fields["End Date"]);
             endDate.setDate(endDate.getDate()+1)
-
+            endDate = endDate.toISOString();
             let postDataGoogleCalendarIntegration = {
                 'summary': `${result.fields["Name"]} on Leave (${result.fields["Email"][0]})`,
                 'description': `${result.fields["Leave Reason"]}`,
@@ -317,7 +317,7 @@ app.put("/api/leaves/setStatus", async (req, res) => {
                     'date': result.fields["Start Date"],
                 },
                 'end': {
-                    'date': endDate,
+                    'date': endDate.split("T")[0]
                 },
             }
 
