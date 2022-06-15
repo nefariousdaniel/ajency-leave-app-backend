@@ -42,6 +42,7 @@ app.post("/api/register", async (req, res) => {
         }
         req.body.Password = bcrypt.hashSync(req.body.Password, 8);
         req.body.Status = "Active";
+        req.body["Is Admin"] = "false";
         result = await base("Company").create([{ fields: req.body }]);
         res.status(201).json({
             statusCode: 201,
@@ -182,7 +183,7 @@ app.post("/api/leaves/requestLeave", async (req, res) => {
                     try {
                         emailList.push(r[0].fields.Email)
                     } catch {
-
+                        emailList.push("tanvi@ajency.in")
                     }
                 })
         }
