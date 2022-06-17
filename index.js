@@ -176,14 +176,14 @@ app.post("/api/leaves/requestLeave", async (req, res) => {
         result = await base("Company").find(req.body.decodedToken.user["Record ID"]);
         var teamsBelongsTo = result.fields["Teams (Belongs To)"];
         let emailList = []
-
+        emailList.push("tanvi@ajency.in")
         for (el of teamsBelongsTo) {
             await base("Company").select({ filterByFormula: `FIND("${el}",{Teams Leading (Record ID)})` }).firstPage()
                 .then(r => {
                     try {
                         emailList.push(r[0].fields.Email)
-                    } catch {
-                        emailList.push("tanvi@ajency.in")
+                    } catch (error) {
+                        console.log(error)
                     }
                 })
         }
