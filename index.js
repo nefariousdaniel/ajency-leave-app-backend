@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const axios = require("axios").default;
+const dotenv = require("dotenv").config();
 const { CreateCalendarEvent } = require("./GoogleCalendarIntegration")
 const { SendMail } = require("./GoogleMailIntegration")
 
@@ -176,7 +177,7 @@ app.post("/api/leaves/requestLeave", async (req, res) => {
         result = await base("Company").find(req.body.decodedToken.user["Record ID"]);
         var teamsBelongsTo = result.fields["Teams (Belongs To)"];
         let emailList = []
-        emailList.push("tanvi@ajency.in")
+        emailList.push(process.env.SUPERADMINEMAIL)
         for (el of teamsBelongsTo) {
             await base("Company").select({ filterByFormula: `FIND("${el}",{Teams Leading (Record ID)})` }).firstPage()
                 .then(r => {
@@ -340,6 +341,7 @@ app.put("/api/leaves/setStatus", async (req, res) => {
     }
 
 })
+
 
 let PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
