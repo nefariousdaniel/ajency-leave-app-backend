@@ -98,7 +98,7 @@ app.post("/api/login", async (req, res) => {
 app.use((req, res, next) => {
     try {
         let token = req.headers.authorization.split(" ")[1];
-        let decodedToken = jwt.verify(token, "SomeSecretJibberJabber", { ignoreExpiration: true })
+        let decodedToken = jwt.verify(token, "SomeSecretJibberJabber")
         req.body.decodedToken = decodedToken;
         next();
     } catch (error) {
