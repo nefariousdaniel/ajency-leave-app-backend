@@ -178,16 +178,22 @@ app.post("/api/leaves/requestLeave", async (req, res) => {
         var teamsBelongsTo = result.fields["Teams (Belongs To)"];
         let emailList = []
         emailList.push(process.env.SUPERADMINEMAIL)
-        for (el of teamsBelongsTo) {
-            await base("Company").select({ filterByFormula: `FIND("${el}",{Teams Leading (Record ID)})` }).firstPage()
-                .then(r => {
-                    try {
-                        emailList.push(r[0].fields.Email)
-                    } catch (error) {
-                        console.log(error)
-                    }
-                })
+        
+        try {
+            for (el of teamsBelongsTo) {
+                await base("Company").select({ filterByFormula: `FIND("${el}",{Teams Leading (Record ID)})` }).firstPage()
+                    .then(r => {
+                        try {
+                            emailList.push(r[0].fields.Email)
+                        } catch (error) {
+                            console.log(error)
+                        }
+                    })
+            }
+        } catch (error) {
+            console.log(error);
         }
+
 
         let postDataEmailIntegration = {
             to: emailList,
