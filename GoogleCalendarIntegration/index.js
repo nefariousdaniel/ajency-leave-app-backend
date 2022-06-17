@@ -3,7 +3,8 @@ const path = require('path');
 const readline = require('readline');
 const { google } = require('googleapis');
 
-const EMPLEAVECALENDARID = "c_c6i7l4odcf9vlra6cijcdseppg@group.calendar.google.com"
+//const EMPLEAVECALENDARID = "c_c6i7l4odcf9vlra6cijcdseppg@group.calendar.google.com"
+const EMPLEAVECALENDARID = "c_shmrj1bne8mohtf2monv4dihl4@group.calendar.google.com"
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
